@@ -1,0 +1,146 @@
+---
+title: "Function call speed in R"
+output:
+  html_document:
+    theme: null
+    css: mystyle.css
+    toc: yes
+---
+
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{Function call speed in R}
+-->
+
+```{r echo = FALSE}
+options(width = 100)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r echo = FALSE}
+library(rspeed)
+library(microbenchmark)
+```
+
+## C function call overhead
+
+This section contains tests that are related to C function call overhead. The relevant code is contained in:
+
+* `R/registration.R`
+* `src/registration.C`
+
+
+### Call method
+
+In the [Speed considerations](http://cran.r-project.org/doc/manuals/r-release/R-exts.html#Speed-considerations) section of Writing R Extensions, there are three ways listed of calling a C function using the `.Call` interface:
+
+* `.Call("C_identity", x)`
+* `.Call("C_identity", x, package = "rspeed")`
+* `.Call(C_identity, x)`
+
+These three examples call `C_identity` which is as about as simple as a function can get: it simply returns the value passed in.
+
+Additionally, according to the [Registering native routines](http://cran.r-project.org/doc/manuals/r-release/R-exts.html#Registering-native-routines) section, registered C routines are called faster than non-registered routines.
+
+For this test we'll compare three ways of calling `C_identity`, which is not a registered routine, against `C_identity_reg`, which is a registered routine.
+
+```{r} 
+x <- 1:10
+
+# The C function objects aren't normally visible outside of the rspeed namespace,
+# so we'll make copies of them to run the benchmark.
+C_identity     <- rspeed:::C_identity
+C_identity_reg <- rspeed:::C_identity_reg
+
+microbenchmark(
+  .Call("C_identity", x),
+  .Call("C_identity", x, package = "rspeed"),
+  .Call(C_identity, x),
+  .Call("C_identity_reg", x),
+  .Call(C_identity_reg, x),
+  unit = "us"
+)
+```
+
+Calling the functions with a string is much, much slower than passing in a native symbol object. When there are such large differences between the speeds of functions, the benchmarks can report that the quick functions run slower, compared to if the quick functions are tested separately.
+
+We'll just compare the registered routine and the non-registered routine, without involving strings.
+
+```{r}
+microbenchmark(
+  .Call(C_identity, x),
+  .Call(C_identity_reg, x),
+  unit = "us"
+)
+```
+
+The registered function is _slower_ --- around 0.35µs vs. 0.25µs for the non-registered function.
+
+Since we know that the non-registered routine `C_identity` is faster, we'll just use that one for future tests.
+
+### Size of object passed to C function
+
+Does the size of the object passed to a function matter?
+
+```{r}
+x <- 1
+y <- as.list(1:1e5)
+
+microbenchmark(
+  .Call(C_identity, x),
+  .Call(C_identity, y),
+  unit = "us"
+)
+```
+
+Nope.
+
+### Input and output
+
+
+The `C_null` function simply returns `NULL`, whereas the `C_identity` function returns the input.
+
+```{r}
+x <- 1
+
+C_null <- rspeed:::C_null
+
+microbenchmark(
+  .Call(C_null),            # No input, NULL return
+  .Call(C_identity, NULL),  # NULL literal input, NULL return
+  .Call(C_identity, 1),     # number literal input, number return
+  .Call(C_identity, x),     # number variable input, number return
+  unit = "us"
+)
+```
+
+From the results, it appears that calling a function with no arguments is essentially the same speed as calling a function with one argument, when that argument is a literal. If the argument is variable, there's a very small amount of time spent in variable lookup (~0.03µs).
+
+### Number of arguments passed to C function
+
+Does the number of arguments passed to a function matter?
+
+
+### R wrapper function overhead
+
+How much extra time does it take to use an R wrapper function, instead of using `.Call()` directly?
+
+The `R_null` and `R_identity` functions are simple wrappers around `C_null` and `C_identity`:
+
+```{r eval = FALSE}
+R_null <- function() .Call(C_null)
+
+R_identity <- function(x) .Call(C_identity, x)
+```
+
+```{r}
+microbenchmark(
+  .Call(C_identity, 10),
+  R_identity(10),
+  .Call(C_null),
+  R_null(),
+  unit = "us"
+)
+```
+
+This R wrapper function costs about 0.3µs when there's one argument, and about 0.2µs when there are no arguments.
