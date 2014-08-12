@@ -190,3 +190,58 @@ microbenchmark(
 ### Summary of `ls`
 
 If you don't want to use C code, `names(as.list.environment())` is the fastest way, and it's not too much slower than the `C_ls` function in this package.
+
+
+
+## Accessing objects in environments and lists
+
+[To be written up]
+
+```{r}
+e <- new.env()
+l <- list()
+
+microbenchmark(
+  e$a <- 1,
+  e[["b"]] <- 1,
+  .Primitive("[[<-")(e, "c", 1),
+  assign("d", 1, envir = e),
+  .Internal(assign("e", 1, e, FALSE)),
+
+  l$a <- 1,
+  l[["b"]] <- 1,
+  l <- .Primitive("[[<-")(l, "c", 1)
+)
+
+microbenchmark(
+  e$a,
+  e[["b"]],
+  .Primitive("[[")(e, "c"),
+  get("d", envir = e, inherits = FALSE),
+  .Internal(get("e", e, "any", FALSE)),
+
+  l$a,
+  l[["b"]],
+  .Primitive("[[")(l, "c"),
+  .subset2(l, "c")
+)
+```
+
+
+## Checking for existence
+
+```{r}
+e <- list(a=1, b=2)
+microbenchmark(
+  exists('a', NULL, as.environment(e), mode = "any" , FALSE),
+  exists('a', e, inherits = FALSE),
+  exists('a', e),
+  'a' %in% names(e),
+  e[['a']],
+  e$a,
+  e[['c']],
+  e$c,
+  unit = "us"
+)
+
+```
