@@ -27,18 +27,3 @@ static const R_CallMethodDef callMethods[] = {
 void R_init_rspeed(DllInfo *info) {
    R_registerRoutines(info, NULL, callMethods, NULL, NULL);
 }
-
-
-// In NAMESPACE:
-// useDynLib(qstack,C_identity)
-// useDynLib(qstack, .registration = TRUE)
-
-// Testing:
-//
-// library(microbenchmark)
-// microbenchmark(
-//   .Call("C_identity", 1, TRUE),
-//   .Call("C_identity", 1, TRUE, package = "qstack"),
-//   .Call(C_identity, 1, TRUE),
-//   .Call(C_identity_reg, 1, TRUE)
-// )
