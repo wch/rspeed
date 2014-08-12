@@ -2,7 +2,9 @@
 
 export(R_identity)
 export(R_identity_reg)
+export(R_ls)
 export(R_null)
 useDynLib(rspeed,.registration=TRUE)
 useDynLib(rspeed,C_identity)
+useDynLib(rspeed,C_ls)
 useDynLib(rspeed,C_null)

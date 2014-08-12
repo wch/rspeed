@@ -1,0 +1,192 @@
+---
+title: "Environments and lists"
+output:
+  html_document:
+    theme: null
+    css: mystyle.css
+    toc: yes
+---
+
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{Environments and lists}
+-->
+
+```{r echo = FALSE}
+options(width = 100)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r echo = FALSE}
+library(rspeed)
+library(microbenchmark)
+
+print.microbenchmark <- function(x, ...) {
+  mb_summary <- function(x) {
+    res <- summary(x, unit="us")
+    data.frame(name = res$expr, median = res$median)
+  }
+  
+  print(mb_summary(x))
+}
+
+```
+
+## Accessing hashed and unhashed environments
+
+
+## `ls`
+
+Doing `ls` on a very simple environment is very slow --- on the order of 10 µs:
+
+```{r}
+e <- list2env(list(a=1, b=2, c=3, d=4, e=5, f=6), hash = FALSE)
+microbenchmark(ls(e))
+```
+
+It may come as a surprise that `ls` is much slower than the `names` function, which does the same thing for lists as `ls` does for environments. In this section we'll look at what makes `ls` slow, and ways of speeding it up.
+
+
+### Arguments to `ls`
+
+If you look at the definition of `ls`, it's apparent that there is a lot of inefficiency, just from looking at the function arguments:
+
+```{r}
+ls
+#> function (name, pos = -1L, envir = as.environment(pos), all.names = FALSE, pattern) 
+#> {
+#>     if (!missing(name)) {
+#>         pos <- tryCatch(name, error = function(e) e)
+#>         if (inherits(pos, "error")) {
+#>             name <- substitute(name)
+#>             if (!is.character(name)) 
+#>                 name <- deparse(name)
+#>             warning(gettextf("%s converted to character string", 
+#>                 sQuote(name)), domain = NA)
+#>             pos <- name
+#>         }
+#>     }
+#>     all.names <- .Internal(ls(envir, all.names))
+#>     ...
+#> }
+```
+
+Normally you just pass in an environment as the first argument, and then the function goes through a lot of contortions to get that argument to be assigned to `envir`, which it passes on to `Internal(ls())`.
+
+It turns out that simply passing the environment as `envir` avoids all that work, and results in a big performance improvement:
+
+```{r}
+e <- list2env(list(a=1, b=2, c=3, d=4, e=5, f=6), hash = FALSE)
+microbenchmark(
+  ls(e),
+  ls(envir = e)
+)
+```
+
+You should always use the `envir` argument if speed matters.
+
+## `ls` vs `names`
+
+As I mentioned earlier, `ls` is much slower than `names`, and we'll compare the two of them here. For `ls`, we'll use hashed and unhashed environments. We'll also compare large and small environments/lists.
+
+```{r}
+# Small
+l <- list(a=1, b=2, c=3, d=4, e=5, f=6)
+e <- list2env(l, hash = FALSE)
+h <- list2env(l, hash = TRUE)
+
+# Large - we'll just grab everything from stats
+l2 <- as.list(asNamespace('stats'))
+e2 <- list2env(l2, hash = FALSE)
+h2 <- list2env(l2, hash = TRUE)
+
+length(l2)
+```
+
+The small sets have 6 items; the large sets have `1090` items.
+
+```{r}
+microbenchmark(
+  names(l),
+  ls(envir = e, all.names = TRUE),
+  ls(envir = h, all.names = TRUE),
+  names(l2),
+  ls(envir = e2, all.names = TRUE),
+  ls(envir = h2, all.names = TRUE),
+  unit = "us"
+)
+```
+
+For small sets, `ls` is about 10x slower than `names`. For large sets, the difference is on the order of 6000x. `names` is barely slowed down by the larger set, whereas `ls()` takes a huge hit from the larger set. To get the keys from the large environment, it takes about 3ms!
+
+As for hashed and unhashed environments: for small sets, hashed environments are faster; for large sets, unhashed environments are slightly faster.
+
+We can throw one more option into the mix: instead of doing `ls()`, we'll try converting it to a list, then run `names` on the list. We'll add this method to the previous tests.
+
+```{r}
+microbenchmark(
+  names(l),
+
+  ls(envir = e, all.names = TRUE),
+  names(as.list.environment(e, all.names = TRUE)),
+
+  ls(envir = h, all.names = TRUE),
+  names(as.list.environment(h, all.names = TRUE)),
+
+  names(l2),
+
+  ls(envir = e2, all.names = TRUE),
+  names(as.list.environment(e2, all.names = TRUE)),
+
+  ls(envir = h2, all.names = TRUE),
+  names(as.list.environment(h2, all.names = TRUE)),
+
+  unit = "us"
+)
+```
+
+Bizarrely, our roundabout way of getting the names is much, much faster than running `ls()`.
+
+Notes: We used `ls(all.names = TRUE)` so that it behaves like `names`. Also, we used the explicit `as.list.environment` instead of `as.list` to avoid the cost of S3 method dispatch.
+
+
+## A C replacement for `ls`
+
+One big difference between `names()` and `ls()` is that the latter sorts the results, and this is a very expensive operation. (I'm not sure why sorting is desirable, especially given its cost.)
+
+The rspeed package contains a C function `C_ls`, which is derived from the `R_lsInternal` function, with the sort removed. We'll add tests of `C_ls` to the ones from before:
+
+```{r}
+# Need to copy C_ls object out of namespace for this test
+C_ls <- rspeed:::C_ls
+
+microbenchmark(
+  names(l),
+
+  ls(envir = e, all.names = TRUE),
+  names(as.list.environment(e, all.names = TRUE)),
+  .Call(C_ls, e),
+
+  ls(envir = h, all.names = TRUE),
+  names(as.list.environment(h, all.names = TRUE)),
+  .Call(C_ls, h),
+
+  names(l2),
+
+  ls(envir = e2, all.names = TRUE),
+  names(as.list.environment(e2, all.names = TRUE)),
+  .Call(C_ls, e2),
+
+  ls(envir = h2, all.names = TRUE),
+  names(as.list.environment(h2, all.names = TRUE)),
+  .Call(C_ls, h2),
+
+  unit = "us"
+)
+```
+
+`.Call(C_ls)` isn't as fast as `names()` on a list, but it's still much better than a regular `ls()` and somewhat faster than `names(as.list())`.
+
+### Summary of `ls`
+
+If you don't want to use C code, `names(as.list.environment())` is the fastest way, and it's not too much slower than the `C_ls` function in this package.
