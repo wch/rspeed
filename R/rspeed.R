@@ -1,0 +1,2 @@
+#' @importFrom Rcpp cppFunction
+NULL
