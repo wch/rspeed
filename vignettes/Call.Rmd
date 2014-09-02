@@ -27,8 +27,9 @@ library(microbenchmark)
 This section contains tests that are related to C function call overhead. The relevant code is contained in:
 
 * `R/registration.R`
-* `src/registration.C`
+* `src/registration.c`
 
+**UPDATE:** Registration doesn't actually work unless all the functions are registered. To properly test this, it needs to be moved into its own package.
 
 ### Call method
 
