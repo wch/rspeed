@@ -1,0 +1,109 @@
+---
+title: "Escaping strings in R"
+output:
+  html_document:
+    theme: null
+    css: mystyle.css
+    toc: yes
+---
+
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{Escaping strings in R}
+-->
+
+```{r echo = FALSE}
+options(width = 100)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r echo = FALSE}
+library(rspeed)
+library(microbenchmark)
+```
+
+## Escaping characters in R
+
+Here are three functions that escape strings in R.
+
+```{r}
+# Version 1
+escape1 <- function(x) {
+  stopifnot(is.character(x))
+  vapply(x, deparse, character(1), USE.NAMES=FALSE)
+}
+
+# Version 2
+escape2 <- function(x) {
+  stopifnot(is.character(x))
+  if(!length(x)) return(x)
+  x <- gsub("\\", "\\\\", x, fixed=TRUE)
+  x <- gsub("\"", "\\\"", x, fixed=TRUE)
+  x <- gsub("\n", "\\n", x, fixed=TRUE)
+  x <- gsub("\r", "\\r", x, fixed=TRUE)
+  x <- gsub("\t", "\\t", x, fixed=TRUE)
+  x <- gsub("\b", "\\b", x, fixed=TRUE)
+  x <- gsub("\f", "\\f", x, fixed=TRUE)
+  paste0("\"", x, "\"")
+}
+
+# Version 3 - implemented in C, in rspeed package
+escape3 <- escape_chars_
+```
+
+
+Here are the results, and some sanity checks that all three versions have the same output:
+
+```{r}
+# Check that all three have the same output, and return the output
+escape_test <- function(vec) {
+  res1 <- escape1(vec)
+  res2 <- escape2(vec)
+  res3 <- escape3(vec)
+
+  if (!identical(res1, res2) || !identical(res2, res3)) {
+    stop("Results are not all identical.")
+  }
+  res1
+}
+
+escape_test(c("line\nline\\", "x", ""))
+cat(escape_test(c("line\nline\\", "x", "")))
+escape_test(character(0))
+
+# Extended characters - not sure how non-ASCII and non-UTF8 will work
+escape_test("\u5c")
+escape_test("\u5c22")
+```
+
+
+Now we'll do a more strenuous test and get timings:
+
+```{r}
+# Create vector with random trings
+mychars <- c(letters, " ", '"', "\\", "\t", "\n", "\r", "'", "/", "#", "$");
+createstring <- function(length){
+  paste(mychars[ceiling(runif(length, 0, length(mychars)))], collapse="")
+}
+strings <- vapply(rep(1000, 1000), createstring, character(1), USE.NAMES=FALSE)
+
+# Test performance
+system.time(out1 <- escape1(strings))
+system.time(out2 <- escape2(strings))
+system.time(out3 <- escape3(strings))
+
+# Verify that output is identical
+identical(out1, out2)
+identical(out2, out3)
+
+# Verify that escape was correct
+orig1 <- vapply(out1, function(x){parse(text=x)[[1]]}, character(1), USE.NAMES=FALSE)
+identical(strings, orig1)
+```
+
+
+## Appendix
+
+```{r}
+sessionInfo()
+```
