@@ -83,7 +83,7 @@ SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
   for (int i = 0; i < len; i++) {
     // Grow if necessary
     if (n + 40 > outlen) {
-      outlen = outlen * 2;
+      outlen = outlen * 1.5;
       out = (char*) realloc(out, outlen);
     }
 
