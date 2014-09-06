@@ -1,8 +1,12 @@
 #include <R.h>
 #include <Rdefines.h>
 
-// Return the offset of the string without any trailing 0's that come after a
-// decimal.
+// Given a string:
+// - Find the offset of the string without any trailing 0's that come after a
+//   decimal point.
+// - If the string is "-0", replace it with "0".
+// - Place a null terminator at the end of the trimmed string.
+// - Return the new length of the string.
 int strip_trailing_zeros(char* str, int len) {
   int len_tmp = len; // Tentative end of string, while trying to remove trailing 0's
   char tmp;
@@ -35,7 +39,8 @@ int strip_trailing_zeros(char* str, int len) {
   return len;
 }
 
-
+// Given a numeric vector, return a string that's formatted as a JSON array
+// with all the values.
 SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
   if (!isReal(x))
     error("x must be a numeric vector.");
@@ -121,8 +126,11 @@ SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
           n += 6;
         }
       }
+
     } else {
+      // Put the number string directly into the out buffer
       inc = snprintf((char*)(out + n), max_len, format_str, num);
+
       // Remove trailing 0's, if they're after a decimal point.
       inc = strip_trailing_zeros((char*)(out + n), inc);
       n += inc;
