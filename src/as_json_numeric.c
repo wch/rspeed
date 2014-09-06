@@ -42,8 +42,8 @@ int strip_trailing_zeros(char* str, int len) {
 // Given a numeric vector, return a string that's formatted as a JSON array
 // with all the values.
 SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
-  if (!isReal(x))
-    error("x must be a numeric vector.");
+  if (!isReal(x) && !isInteger(x))
+    error("x must be a numeric or integer vector.");
   if (!isInteger(digits) && !isReal(digits))
     error("digits must be a number.");
   if (!isString(round))
@@ -51,8 +51,21 @@ SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
   if (!isString(na))
     error("na must be a string.");
 
-  double* nums = REAL(x);
   int len = length(x);
+  if (len == 0)
+    return mkString("[]");
+
+  // Do some things different for doubles vs int
+  double* x_double;
+  int* x_int;
+  Rboolean is_int;
+  if (isReal(x)) {
+    x_double = REAL(x);
+    is_int = FALSE;
+  } else if (isInteger(x)) {
+    x_int = INTEGER(x);
+    is_int = TRUE;
+  }
 
   // Set up the format string for snprintf
   char* format_specifier;
@@ -67,11 +80,11 @@ SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
   snprintf(format_str, 20, "%%.%d%s", asInteger(digits), format_specifier);
 
   // How to handle NA's
-  int na_null;
+  Rboolean na_null;
   if (strcmp(CHAR(asChar(na)), "string") == 0)
-    na_null = 0;
+    na_null = FALSE;
   else if (strcmp(CHAR(asChar(na)), "null") == 0)
-    na_null = 1;
+    na_null = TRUE;
   else
     error("na must be either 'string' or 'null'.");
 
@@ -95,7 +108,14 @@ SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
       out = (char*) realloc(out, outlen);
     }
 
-    num = nums[i];
+    if (is_int) {
+      if (x_int[i] == NA_INTEGER)
+        num = NA_REAL;
+      else
+        num = (double) x_int[i];
+    } else {
+      num = x_double[i];
+    }
 
     if (ISNA(num)) {
       if (na_null) {
@@ -118,7 +138,7 @@ SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
         strcpy(out + n, "null");
         n += 4;
       } else {
-        if (nums[i] > 0) {
+        if (num > 0) {
           strcpy(out + n, "\"Inf\"");
           n += 5;
         } else {
