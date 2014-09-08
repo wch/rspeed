@@ -29,7 +29,7 @@ This section contains tests that are related to C function call overhead. The re
 * `R/registration.R`
 * `src/registration.c`
 
-**UPDATE:** Registration doesn't actually work unless all the functions are registered. To properly test this, it needs to be moved into its own package.
+**UPDATE:** Registration doesn't actually work unless all the functions are registered. To properly test this, it needs to be moved into its own package. The tests below involving registration have been disabled for now.
 
 ### Call method
 
@@ -51,28 +51,28 @@ x <- 1:10
 # The C function objects aren't normally visible outside of the rspeed namespace,
 # so we'll make copies of them to run the benchmark.
 C_identity     <- rspeed:::C_identity
-C_identity_reg <- rspeed:::C_identity_reg
+# C_identity_reg <- rspeed:::C_identity_reg
 
 microbenchmark(
   .Call("C_identity", x),
   .Call("C_identity", x, package = "rspeed"),
   .Call(C_identity, x),
-  .Call("C_identity_reg", x),
-  .Call(C_identity_reg, x),
+#  .Call("C_identity_reg", x),
+#  .Call(C_identity_reg, x),
   unit = "us"
 )
 ```
 
 Calling the functions with a string is much, much slower than passing in a native symbol object. When there are such large differences between the speeds of functions, the benchmarks can report that the quick functions run slower, compared to if the quick functions are tested separately.
 
-We'll just compare the registered routine and the non-registered routine, without involving strings.
+We'll just compare the registered routine and the non-registered routine, without involving strings. (NOTE: disabled because registration didn't work)
 
 ```{r}
-microbenchmark(
-  .Call(C_identity, x),
-  .Call(C_identity_reg, x),
-  unit = "us"
-)
+# microbenchmark(
+#   .Call(C_identity, x),
+#   .Call(C_identity_reg, x),
+#   unit = "us"
+# )
 ```
 
 The registered function is _slower_ --- around 0.35µs vs. 0.25µs for the non-registered function.
