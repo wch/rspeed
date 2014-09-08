@@ -109,6 +109,7 @@ SEXP C_as_json_numeric_collapsed(SEXP x, SEXP digits, SEXP round, SEXP na) {
     }
 
     if (is_int) {
+      // Need to explicitly set NA because (double)NA_INTEGER != NA_REAL
       if (x_int[i] == NA_INTEGER)
         num = NA_REAL;
       else
