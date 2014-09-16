@@ -1,0 +1,105 @@
+---
+title: "match.arg timings"
+output:
+  html_document:
+    theme: null
+    css: mystyle.css
+    toc: yes
+---
+
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{match.arg timings}
+-->
+
+```{r echo = FALSE}
+options(width = 100)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r echo = FALSE}
+library(microbenchmark)
+```
+
+## `match.arg()` timings
+
+How long does it take to call `match.arg()`? Does the time depend on the number of possible arguments, or which argument is matched?
+
+```{r}
+plainarg <- function(x) {
+  x
+}
+
+matcharg2 <- function(x = c("one", "two")) {
+  match.arg(x)
+}
+
+matcharg3 <- function(x = c("one", "two", "three")) {
+  match.arg(x)
+}
+
+
+library(microbenchmark)
+microbenchmark(
+  plainarg("test"),
+
+  matcharg2(),
+  matcharg2("one"),
+  matcharg2("two"),
+
+  matcharg3(),
+  matcharg3("one"),
+  matcharg3("two"),
+  matcharg3("three"),
+
+  unit = "us"
+)
+```
+
+The number of possible values has a negligible effect on speed. Similarly, if a value is provided, which possible value it matches seems to have a negligible effect. However, if _no_ value is passed in, that saves a little bit of time.
+
+Can we make it any faster?
+
+In the definition of `match.arg`, there is some tricky non-standard evaluation code if the second argument, `choices`, is missing, which is usually the case.
+
+
+```{r eval=FALSE}
+match.arg
+#> function (arg, choices, several.ok = FALSE) 
+#> {
+#>     if (missing(choices)) {
+#>         formal.args <- formals(sys.function(sys.parent()))
+#>         choices <- eval(formal.args[[deparse(substitute(arg))]])
+#>     }
+#>     ....
+#> }
+```
+
+What happens if we pass in some values for `choices`?
+
+```{r}
+matcharg2_choices <- function(x = c("one", "two")) {
+  match.arg(x, choices = c("one", "two"))
+}
+
+microbenchmark(
+  plainarg("test"),
+
+  matcharg2(),
+  matcharg2("one"),
+
+  matcharg2_choices(),
+  matcharg2_choices("one"),
+
+  unit = "us"
+)
+```
+
+This saves a huge amount of time. In the usual case, where `choices` is missing, most of the time is spent in the NSE.
+
+
+## Appendix
+
+```{r}
+sessionInfo()
+```
