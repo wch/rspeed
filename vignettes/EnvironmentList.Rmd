@@ -201,6 +201,7 @@ If you don't want to use C code, `names(as.list.environment())` is the fastest w
 e <- new.env()
 l <- list()
 
+# Assignment into environments and lists
 microbenchmark(
   e$a <- 1,
   e[["b"]] <- 1,
@@ -213,17 +214,19 @@ microbenchmark(
   l <- .Primitive("[[<-")(l, "c", 1)
 )
 
+# Accessing objects in environments and lists
 microbenchmark(
   e$a,
-  e[["b"]],
-  .Primitive("[[")(e, "c"),
-  get("d", envir = e, inherits = FALSE),
-  .Internal(get("e", e, "any", FALSE)),
+  e[["a"]],
+  .Primitive("[[")(e, "a"),
+  get("a", e, inherits = FALSE),
+  get("a", envir = e, inherits = FALSE),
+  .Internal(get("a", e, "any", FALSE)),
 
   l$a,
-  l[["b"]],
-  .Primitive("[[")(l, "c"),
-  .subset2(l, "c")
+  l[["a"]],
+  .Primitive("[[")(l, "a"),
+  .subset2(l, "a")
 )
 ```
 
@@ -231,16 +234,43 @@ microbenchmark(
 ## Checking for existence
 
 ```{r}
-e <- list(a=1, b=2)
+# Environments
+e <- new.env()
+e$a <- 1
+
+# Test for existence of `a` (which exists), and `c` (which doesn't)
 microbenchmark(
-  exists('a', NULL, as.environment(e), mode = "any" , FALSE),
   exists('a', e, inherits = FALSE),
-  exists('a', e),
-  'a' %in% names(e),
-  e[['a']],
-  e$a,
-  e[['c']],
-  e$c,
+  exists('a', envir = e, inherits = FALSE),
+  .Internal(exists('a', e, 'any', FALSE)),
+  'a' %in% ls(e, all.names = TRUE),
+  is.null(e[['a']]),
+  is.null(e$a),
+
+  exists('c', e, inherits = FALSE),
+  exists('c', envir = e, inherits = FALSE),
+  .Internal(exists('c', e, 'any', FALSE)),
+  'c' %in% ls(e, all.names = TRUE),
+  is.null(e[['c']]),
+  is.null(e$c),
+
+  unit = "us"
+)
+
+
+# Lists
+l <- list(a=1)
+microbenchmark(
+  exists('a', l, inherits = FALSE),
+  'a' %in% names(l),
+  is.null(l[['a']]),
+  is.null(l$a),
+
+  exists('c', l, inherits = FALSE),
+  'c' %in% names(l),
+  is.null(l[['c']]),
+  is.null(l$c),
+
   unit = "us"
 )
 
