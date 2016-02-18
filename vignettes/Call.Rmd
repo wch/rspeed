@@ -63,7 +63,7 @@ microbenchmark(
 )
 ```
 
-Calling the functions with a string is much, much slower than passing in a native symbol object. When there are such large differences between the speeds of functions, the benchmarks can report that the quick functions run slower, compared to if the quick functions are tested separately.
+Calling the functions with a string and without specifying `PACKAGE` is much, much slower than passing in a native symbol object. If the function is called with a string and `PACKAGE` is specified, it gets much faster, but still not as fast as passing the symbol object. When there are such large differences between the speeds of functions, the benchmarks can report that the quick functions run slower, compared to if the quick functions are tested separately.
 
 We'll just compare the registered routine and the non-registered routine, without involving strings. (NOTE: disabled because registration didn't work)
 
