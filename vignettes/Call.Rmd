@@ -36,7 +36,7 @@ This section contains tests that are related to C function call overhead. The re
 In the [Speed considerations](http://cran.r-project.org/doc/manuals/r-release/R-exts.html#Speed-considerations) section of Writing R Extensions, there are three ways listed of calling a C function using the `.Call` interface:
 
 * `.Call("C_identity", x)`
-* `.Call("C_identity", x, package = "rspeed")`
+* `.Call("C_identity", x, PACKAGE = "rspeed")`
 * `.Call(C_identity, x)`
 
 These three examples call `C_identity` which is as about as simple as a function can get: it simply returns the value passed in.
@@ -55,7 +55,7 @@ C_identity     <- rspeed:::C_identity
 
 microbenchmark(
   .Call("C_identity", x),
-  .Call("C_identity", x, package = "rspeed"),
+  .Call("C_identity", x, PACKAGE = "rspeed"),
   .Call(C_identity, x),
 #  .Call("C_identity_reg", x),
 #  .Call(C_identity_reg, x),
